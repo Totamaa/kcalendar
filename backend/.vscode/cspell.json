@@ -1,0 +1,33 @@
+{
+    "version": "0.2",
+    "ignorePaths": [
+        "*.ics",
+        ".gitignore",
+        "*.log*"
+    ],
+    "dictionaryDefinitions": [],
+    "dictionaries": [],
+    "words": [
+        "calname",
+        "calscale",
+        "CALSCALE",
+        "dotmap",
+        "dtstart",
+        "Esports",
+        "ical",
+        "Joblide",
+        "joblife",
+        "Karmine",
+        "leagueoflegend",
+        "pandascore",
+        "Pandascore",
+        "prodid",
+        "Riotapi",
+        "slowapi",
+        "valo",
+        "valorant",
+        "vevent"
+    ],
+    "ignoreWords": [],
+    "import": []
+}
