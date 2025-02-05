@@ -19,15 +19,13 @@ class EsportCalendarService:
         self.base_url = settings.BACK_PANDA_BASE_URL
         self.api_key = settings.BACK_PANDA_API_KEY
         self.team_ids = [
-            # settings.BACK_PANDA_ID_JL_LOL,
-            # settings.BACK_PANDA_ID_JL_VALO,
-            128268, # KC blue
-            136165, # KC Blue stars
-            134078, # KC
-            132777, # KC GC
-            130922,
-            129570,
-            136080,
+            134078, # LOL KC
+            128268, # LOL KC blue
+            136080, # LOL KC blue stars
+            130922, # VALO KC
+            132777, # VALO KC GC
+            136165, # VALO KC Blue stars
+            129570, # RL
         ]
         self.static_dir = "static"  # Directory to save the .ics file
         self.ics_file_path = os.path.join(self.static_dir, "calendar.ics")  # Path to the final .ics file
@@ -86,6 +84,12 @@ class EsportCalendarService:
             self.logging.info(f"Fetched match: {match.slug} at {datetime.fromisoformat(match.begin_at)} from tournament {match.tournament.slug}")
             
         return matches
+    
+    def _parse_match_lol_valo(self):
+        raise NotImplementedError("Not implemented yet")
+    
+    def _parse_match_rl(self):
+        raise NotImplementedError("Not implemented yet")
  
     def _load_existing_calendar(self):
         """Load the existing .ics calendar file if it exists, otherwise return a new calendar"""
@@ -105,7 +109,7 @@ class EsportCalendarService:
         """Create a new calendar with default properties"""
         calendar = Calendar()
         calendar.add('version', '2.0')
-        calendar.add('prodid', '-//joblife-calendar.fr//Esport Calendar//EN')
+        calendar.add('prodid', '-//kcalendar.eu//Esport Calendar//EN')
         calendar.add('calscale', 'GREGORIAN')
         calendar.add('x-wr-calname', 'Esports Matches')
         return calendar
