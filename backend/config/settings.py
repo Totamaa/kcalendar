@@ -17,8 +17,6 @@ class Settings(BaseSettings):
     
     BACK_PANDA_BASE_URL: str
     BACK_PANDA_API_KEY: str
-    BACK_PANDA_ID_JL_LOL: int
-    BACK_PANDA_ID_JL_VALO: int
     BACK_PANDA_REFRESH_INTERVAL: int
     
     model_config = SettingsConfigDict(env_file=".env")
