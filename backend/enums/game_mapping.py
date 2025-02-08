@@ -6,8 +6,8 @@ class GameFormat(Enum):
 
 # Mapping du slug du jeu vers son format.
 GAME_FORMAT_MAPPING = {
-    "lol": GameFormat.TWO_TEAM,
-    "valo": GameFormat.TWO_TEAM,
+    "league-of-legends": GameFormat.TWO_TEAM,
+    "valorant": GameFormat.TWO_TEAM,
     "rocketleague": GameFormat.TWO_TEAM,
     # Pour le futur (exemple) :
     # "fortnite": GameFormat.MULTI_PLAYER,

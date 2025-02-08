@@ -108,7 +108,7 @@ class EsportCalendarService:
         event.add('summary', summary)
 
         description = (
-            f"Video Game: {match.videogame_name} ({match.videogame_slug})\n"
+            f"Video Game: [{match.videogame_slug}] {match.videogame_name}\n"
             f"League: {match.league_name}\n"
             f"Tournament: [Tier {match.tournament_tier}] {match.tournament_slug}\n"
             f"Match: {match.slug}\n"
@@ -121,14 +121,10 @@ class EsportCalendarService:
         if not start_time.tzinfo:
             start_time = pytz.UTC.localize(start_time)
         event.add('dtstart', start_time)
-        if match.number_of_games == 5:
-            duration = timedelta(hours=3)
-        elif match.number_of_games == 3:
-            duration = timedelta(hours=2)
-        else:
-            duration = timedelta(hours=1)
-        event.add('duration', duration)
+        
+        event.add('duration', match.duration)
         event.add('location', vText(match.stream_url))
+        
         return event
 
     def _calendar_event_multi(self, match: MatchMulti):
@@ -140,7 +136,7 @@ class EsportCalendarService:
         event.add('summary', summary)
 
         description = (
-            f"Video Game: {match.videogame_name} ({match.videogame_slug})\n"
+            f"Video Game: [{match.videogame_slug}] {match.videogame_name}\n"
             f"League: {match.league_name}\n"
             f"Tournament: [Tier {match.tournament_tier}] {match.tournament_slug}\n"
             f"Match: {match.slug}\n"
