@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     
     BACK_CACHE_DURATION: int
     
+    BACK_LOGGING_LEVEL: str = Field(pattern=r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
+    
     BACK_LOG_MAX_BYTES: int
     BACK_LOG_BACKUP_COUNT: int
     

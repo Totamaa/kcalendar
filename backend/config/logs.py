@@ -6,10 +6,10 @@ from config.settings import get_settings
 
 class LoggerManager:
     def __init__(self, log_file_path="logs/app.log"):
-        settings = get_settings()
+        self.settings = get_settings()
         self.log_file_path = log_file_path
-        self.max_bytes = settings.BACK_LOG_MAX_BYTES
-        self.backup_count = settings.BACK_LOG_BACKUP_COUNT
+        self.max_bytes = self.settings.BACK_LOG_MAX_BYTES
+        self.backup_count = self.settings.BACK_LOG_BACKUP_COUNT
         
         log_dir = os.path.dirname(self.log_file_path)
         if not os.path.exists(log_dir):
@@ -17,7 +17,14 @@ class LoggerManager:
 
     def _create_handler(self):
         handler = RotatingFileHandler(self.log_file_path, maxBytes=self.max_bytes, backupCount=self.backup_count)
-        handler.setLevel(logging.INFO)
+        log_levels = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL
+        }
+        handler.setLevel(log_levels.get(self.settings.BACK_LOGGING_LEVEL, logging.INFO))
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt="%Y-%m-%d %H:%M:%S %z")
         handler.setFormatter(formatter)
         return handler

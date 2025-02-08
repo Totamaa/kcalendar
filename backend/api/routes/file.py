@@ -19,7 +19,9 @@ settings = get_settings()
     status_code=200
 )
 async def get_calendar(request: Request):
-    logging.info("Requesting calendar receive")
+    client_ip = ".".join(request.client.host.split(".")[:-1] + ["0"])
+    user_agent = request.headers.get("user-agent")
+    logging.info(f"Requesting calendar receive from {client_ip} with user-agent {user_agent}")
     try:
         file_path = "static/calendar.ics"
         date_format = "%a, %d %b %Y %H:%M:%S GMT"
@@ -38,6 +40,7 @@ async def get_calendar(request: Request):
         # If the ETag or the last modified date match the request, return a 304 Not Modified response
         if (if_none_match and if_none_match == etag) or \
            (if_modified_since and datetime.strptime(if_modified_since, date_format) >= last_modified):
+            logging.info(f"Returning 304 Not Modified for {client_ip}")
             return Response(status_code=status.HTTP_304_NOT_MODIFIED)
         
         response = FileResponse(
@@ -53,9 +56,9 @@ async def get_calendar(request: Request):
         
         response.headers["ETag"] = etag
         response.headers["Last-Modified"] = last_modified_str
-        
+        logging.info(f"Returning 200 OK for {client_ip}")
         return response
         
     except Exception as e:
-        logging.error(f"Error with the calendar: {e}")
+        logging.error(f"Error with the calendar for {client_ip}: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error with the calendar")
