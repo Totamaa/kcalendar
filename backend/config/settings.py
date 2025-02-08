@@ -21,10 +21,11 @@ class Settings(BaseSettings):
     BACK_PANDA_API_KEY: str
     BACK_PANDA_REFRESH_INTERVAL: int
     
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file=".env") # load settings from .env file
     
     
 @lru_cache
 def get_settings() -> Settings:
+    """Load and cache settings"""
     return Settings()
 
