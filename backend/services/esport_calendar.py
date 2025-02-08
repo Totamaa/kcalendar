@@ -117,7 +117,7 @@ class EsportCalendarService:
             f"League: {match.league_name}\n"
             f"Tournament: [Tier {match.tournament_tier}] {match.tournament_slug}\n"
             f"Match: {match.slug}\n"
-            f"Team 1: [{opp1.location}] {opp1.location} ({opp1.acronym})\n"
+            f"Team 1: [{opp1.location}] {opp1.name} ({opp1.acronym})\n"
             f"Team 2: [{opp2.location}] {opp2.name} ({opp2.acronym})"
         )
         event.add('description', description)
