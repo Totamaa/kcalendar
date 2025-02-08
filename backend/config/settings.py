@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     
     BACK_CACHE_DURATION: int
     
+    BACK_LOGGING_LEVEL: str = Field(pattern=r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
+    
     BACK_LOG_MAX_BYTES: int
     BACK_LOG_BACKUP_COUNT: int
     
@@ -19,10 +21,11 @@ class Settings(BaseSettings):
     BACK_PANDA_API_KEY: str
     BACK_PANDA_REFRESH_INTERVAL: int
     
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file=".env") # load settings from .env file
     
     
 @lru_cache
 def get_settings() -> Settings:
+    """Load and cache settings"""
     return Settings()
 

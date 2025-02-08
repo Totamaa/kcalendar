@@ -1,218 +1,160 @@
-import time
-import requests
-from datetime import datetime, timedelta
 import os
 import shutil
-
-from icalendar import Calendar, Event, vText, vUri
+import time
+from datetime import datetime, timedelta
 import pytz
-from box import Box
-
+from icalendar import Calendar, Event, vText
 from config.logs import LoggerManager
-from config.settings import get_settings
- 
+from enums.game_mapping import GAME_FORMAT_MAPPING, GameFormat
+from services.esport_api import EsportAPIService
+from schemas.match_duo import MatchDuo
+from schemas.match_multi import MatchMulti
+
 class EsportCalendarService:
     def __init__(self):
-        # Initialize the service with configuration
+        # Initialize logger, API service and team IDs for fetching matches
         self.logging = LoggerManager()
-        settings = get_settings()
-        self.base_url = settings.BACK_PANDA_BASE_URL
-        self.api_key = settings.BACK_PANDA_API_KEY
+        self.api_service = EsportAPIService()
         self.team_ids = [
-            134078, # LOL KC
-            128268, # LOL KC blue
-            136080, # LOL KC blue stars
-            130922, # VALO KC
-            132777, # VALO KC GC
-            136165, # VALO KC Blue stars
-            129570, # RL
+            134078,  # LOL KC
+            128268,  # LOL KC blue
+            136080,  # LOL KC blue stars
+            130922,  # VALO KC
+            132777,  # VALO KC GC
+            136165,  # VALO KC Blue stars
+            129570,  # Rocket League
         ]
-        self.static_dir = "static"  # Directory to save the .ics file
-        self.ics_file_path = os.path.join(self.static_dir, "calendar.ics")  # Path to the final .ics file
-        self.temp_ics_file_path = os.path.join(self.static_dir, "calendar_temp.ics")  # Temp file path for atomic update
- 
-        # Ensure the static directory exists
+        self.static_dir = "static"
+        self.ics_file_path = os.path.join(self.static_dir, "calendar.ics")
+        self.temp_ics_file_path = os.path.join(self.static_dir, "calendar_temp.ics")
         os.makedirs(self.static_dir, exist_ok=True)
- 
-    def _fetch_upcoming_matches(self, team_id):
-        """Fetch upcoming match data from the PandaScore API"""
-        url = f"{self.base_url}/teams/{team_id}/matches?filter[status]=not_started&sort=begin_at"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Accept": "application/json"
-        }
-        
-        self.logging.info(f"Fetching upcoming matches from API... URL: {url}")
-        
-        try:
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()  # Raise an exception if the request fails
-            data = response.json()
-        except requests.RequestException as e:
-            self.logging.error(f"Error fetching matches: {e}")
-            return []
- 
+
+    def update_calendar(self):
+        """Fetch matches and update the ICS calendar file."""
+        self.logging.info("Starting calendar update process...")
+        start_time = time.perf_counter()
+
         matches = []
-        for match_json in data:
-            match = Box(match_json)
-            stream = next(
-                (s for s in match.streams_list if s.main and s.language == 'fr'),
-                next((s for s in match.streams_list if s.main), None)
-            )
-            match.stream_url = stream.raw_url if stream else ""
-            
-            matches.append({
-                "id": f"{match.league_id}{match.tournament_id}{match.serie_id}{match.id}",
-                "tournament_name": match.tournament.name,
-                "tournament_slug": match.tournament.slug,
-                "tournament_tier": match.tournament.tier,
-                "videogame_name": match.videogame.name,
-                "videogame_slug": match.videogame.slug,
-                "begin_at": match.begin_at,
-                "number_of_games": match.number_of_games,
-                "opponents_1_acronym": match.opponents[0].opponent.acronym,
-                "opponents_1_name": match.opponents[0].opponent.name,
-                "opponents_1_location": match.opponents[0].opponent.location,
-                "opponents_2_acronym": match.opponents[1].opponent.acronym,
-                "opponents_2_name": match.opponents[1].opponent.name,
-                "opponents_2_location": match.opponents[1].opponent.location,
-                "slug": match.slug,
-                "league_name": match.league.name,
-                "stream_url": match.stream_url,
-            })
-            
-            self.logging.info(f"Fetched match: {match.slug} at {datetime.fromisoformat(match.begin_at)} from tournament {match.tournament.slug}")
-            
-        return matches
-    
-    def _parse_match_lol_valo(self):
-        raise NotImplementedError("Not implemented yet")
-    
-    def _parse_match_rl(self):
-        raise NotImplementedError("Not implemented yet")
- 
+        for team_id in self.team_ids:
+            self.logging.info(f"Fetching matches for team ID: {team_id}")
+            matches.extend(self.api_service.fetch_matches_for_team(team_id))
+
+        if matches:
+            self._generate_calendar_events(matches)
+            self._replace_calendar_atomically()
+            self.logging.info(f"Calendar updated with {len(matches)} matches.")
+        else:
+            self.logging.warning("No matches fetched.")
+
+        elapsed = time.perf_counter() - start_time
+        self.logging.info(f"Calendar update completed in {elapsed} seconds.")
+
     def _load_existing_calendar(self):
-        """Load the existing .ics calendar file if it exists, otherwise return a new calendar"""
+        """Load the existing calendar or create a new one if it doesn't exist."""
         if os.path.exists(self.ics_file_path):
             try:
                 with open(self.ics_file_path, 'rb') as f:
-                    self.logging.info(f"Loaded existing calendar file: {self.ics_file_path}")
                     return Calendar.from_ical(f.read())
             except Exception as e:
-                self.logging.error(f"Error loading existing calendar: {e}")
-                return self._create_new_calendar()
-        
-        self.logging.info("No existing calendar file found. Creating a new calendar.")
-        return self._create_new_calendar()
- 
-    def _create_new_calendar(self):
-        """Create a new calendar with default properties"""
-        calendar = Calendar()
-        calendar.add('version', '2.0')
-        calendar.add('prodid', '-//kcalendar.eu//Esport Calendar//EN')
-        calendar.add('calscale', 'GREGORIAN')
-        calendar.add('x-wr-calname', 'Esports Matches')
-        return calendar
- 
+                self.logging.error(f"Error loading calendar: {e}")
+                
+        # Create a new calendar if none exists
+        cal = Calendar()
+        cal.add('version', '2.0')
+        cal.add('prodid', '-//esport calendar//')
+        cal.add('calscale', 'GREGORIAN')
+        cal.add('x-wr-calname', 'Esport Matches')
+        return cal
+
     def _generate_calendar_events(self, matches):
-        """Generate calendar events from the match data and update the .ics calendar"""
-        calendar = self._load_existing_calendar()
-        
-        # Garder une trace des événements existants
-        existing_events = {}
-        for component in calendar.walk('vevent'):
-            uid = component.get('uid')
-            if uid:
-                existing_events[uid] = component
- 
+        """Generate or update ICS events from the fetched matches."""
+        cal = self._load_existing_calendar()
+        existing_uids = {comp.get('uid') for comp in cal.walk('vevent') if comp.get('uid')}
+
         for match in matches:
-            match = Box(match)
-            event_uid = f"{match.id}@esport_calendar"
-            
-            # Créer un nouvel événement
-            event = Event()
-            
-            # Configurer l'événement
-            event.add('uid', event_uid)
-            event.add('summary', f"[{match.league_name}] {match.opponents_1_name} - {match.opponents_2_name} ({match.tournament_name} BO{match.number_of_games})")
-            
-            # Description détaillée
-            description = (
-                f"Video Game: [{match.videogame_name}] {match.videogame_slug}\n"
-                f"League: {match.league_name}\n"
-                f"Tournament: [Tier {match.tournament_tier}] {match.tournament_slug}\n"
-                f"Match: {match.slug}\n"
-                f"Team 1: [{match.opponents_1_location}] {match.opponents_1_name} ({match.opponents_1_acronym})\n"
-                f"Team 2: [{match.opponents_2_location}] {match.opponents_2_name} ({match.opponents_2_acronym})"
-            )
-            event.add('description', description)
-            
-            # Gérer la date et la durée
-            start_time = datetime.fromisoformat(match.begin_at)
-            if not start_time.tzinfo:
-                start_time = pytz.UTC.localize(start_time)
-            event.add('dtstart', start_time)
-            
-            # Définir la durée selon le nombre de matchs
-            if match.number_of_games == 5:
-                duration = timedelta(hours=3)
-            elif match.number_of_games == 3:
-                duration = timedelta(hours=2)
+            # Generate events matches
+            if isinstance(match, MatchDuo):
+                event = self._calendar_event_duo(match)
+            elif isinstance(match, MatchMulti):
+                event = self._calendar_event_multi(match)
             else:
-                duration = timedelta(hours=1)
-            event.add('duration', duration)
-            
-            # Ajouter l'URL du stream
-            event.add('location', vText(match.stream_url))
- 
-            # Mettre à jour ou ajouter l'événement
-            if event_uid in existing_events:
-                self.logging.info(f"Updating event: {match.opponents_1_name} vs {match.opponents_2_name}")
-                calendar.subcomponents = [
-                    c for c in calendar.subcomponents 
-                    if not (isinstance(c, Event) and c.get('uid') == event_uid)
+                event = self._calendar_event_duo(match)
+            uid = event.get('uid')
+            # Remove existing event if the UID already exists
+            if uid in existing_uids:
+                cal.subcomponents = [
+                    comp for comp in cal.subcomponents
+                    if not (comp.name == "VEVENT" and comp.get('uid') == uid)
                 ]
-            else:
-                self.logging.info(f"Adding event: {match.opponents_1_name} vs {match.opponents_2_name}")
-            
-            calendar.add_component(event)
- 
-        # Sauvegarder dans le fichier temporaire
+            cal.add_component(event)
+
         with open(self.temp_ics_file_path, 'wb') as f:
-            f.write(calendar.to_ical())
-        
-            self.logging.info(f"Temporary calendar file {self.temp_ics_file_path} generated.")
- 
+            f.write(cal.to_ical())
+        self.logging.info("Temporary calendar file generated.")
+
     def _replace_calendar_atomically(self):
-        """Replace the existing .ics file atomically with the updated one"""
+        """Replace the old calendar file with the new one atomically."""
         try:
-            # Atomically replace the old calendar with the new one
             shutil.move(self.temp_ics_file_path, self.ics_file_path)
-            self.logging.info(f"Successfully updated the calendar file: {self.ics_file_path}.")
+            self.logging.info("Calendar file updated successfully.")
         except Exception as e:
-            self.logging.error(f"Error updating the ICS file: {e}")
-            # If something goes wrong, make sure to clean up the temporary file
+            self.logging.error(f"Error replacing calendar file: {e}")
             if os.path.exists(self.temp_ics_file_path):
                 os.remove(self.temp_ics_file_path)
- 
-    def update_calendar(self):
-        """Main method to update the calendar"""
-        self.logging.info("Starting calendar update process...")
-        start_time = time.perf_counter()
-    
-        matches = []
-        for team_id in self.team_ids:
-            self.logging.info(f"Fetching upcoming matches for team ID: {team_id}")
-            matches.extend(self._fetch_upcoming_matches(team_id))
-    
-        log_nb_fetch_match = f"Total matches fetched: {len(matches)}"
+
+    def _calendar_event_duo(self, match: MatchDuo):
+        """Create an ICS event for a duo-team match."""
+        uid = f"{match.id}@esport_calendar"
+        event = Event()
+        event.add('uid', uid)
+        opp1, opp2 = match.opponents
+        summary = f"[{match.league_name}] {opp1.name} vs {opp2.name} ({match.tournament_name} BO{match.number_of_games})"
+        event.add('summary', summary)
+
+        # Event description with match details
+        description = (
+            f"Video Game: [{match.videogame_slug}] {match.videogame_name}\n"
+            f"League: {match.league_name}\n"
+            f"Tournament: [Tier {match.tournament_tier}] {match.tournament_slug}\n"
+            f"Match: {match.slug}\n"
+            f"Team 1: [{opp1.location}] {opp1.name} ({opp1.acronym})\n"
+            f"Team 2: [{opp2.location}] {opp2.name} ({opp2.acronym})"
+        )
+        event.add('description', description)
+
+        # Ensure time is in UTC if not already
+        start_time = match.begin_at
+        if not start_time.tzinfo:
+            start_time = pytz.UTC.localize(start_time)
+        event.add('dtstart', start_time)
         
-        if matches:
-            self.logging.info(log_nb_fetch_match)
-            self._generate_calendar_events(matches)  # Generate events based on fetched data
-            self._replace_calendar_atomically()  # Replace the old calendar with the new one
-        else:
-            self.logging.warning(log_nb_fetch_match)
-    
-        process_time = time.perf_counter() - start_time
-        self.logging.info(f"Calendar update process completed. (time: {process_time})")
+        event.add('duration', match.duration)
+        event.add('location', vText(match.stream_url))
+        
+        return event
+
+    def _calendar_event_multi(self, match: MatchMulti):
+        """Create an ICS event for a multi-player match."""
+        uid = f"{match.id}@esport_calendar"
+        event = Event()
+        event.add('uid', uid)
+        summary = f"[{match.league_name}] {match.slug}"
+        event.add('summary', summary)
+
+        # Event description for multi-player matches
+        description = (
+            f"Video Game: [{match.videogame_slug}] {match.videogame_name}\n"
+            f"League: {match.league_name}\n"
+            f"Tournament: [Tier {match.tournament_tier}] {match.tournament_slug}\n"
+            f"Match: {match.slug}\n"
+            "Multi-player match details."
+        )
+        event.add('description', description)
+
+        start_time = datetime.fromisoformat(match.begin_at)
+        if not start_time.tzinfo:
+            start_time = pytz.UTC.localize(start_time)
+        event.add('dtstart', start_time)
+        event.add('duration', match.duration)
+        event.add('location', vText(match.stream_url))
+        return event
