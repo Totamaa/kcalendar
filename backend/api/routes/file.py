@@ -19,7 +19,7 @@ settings = get_settings()
     status_code=200
 )
 async def get_calendar(request: Request):
-    client_ip = ".".join(request.client.host.split(".")[:-1] + ["0"])
+    client_ip = ".".join(request.client.host.split(".")[:-1] + ["x"])
     user_agent = request.headers.get("user-agent")
     logging.info(f"Requesting calendar receive from {client_ip} with user-agent {user_agent}")
     try:
