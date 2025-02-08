@@ -25,10 +25,11 @@
         "Pandascore",
         "prodid",
         "Riotapi",
+        "rocketleague",
         "slowapi",
         "valo",
         "valorant",
-        "vevent"
+        "vevent",
     ],
     "ignoreWords": [],
     "import": []
