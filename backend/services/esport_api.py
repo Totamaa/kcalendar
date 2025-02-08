@@ -12,13 +12,14 @@ from schemas.match_multi import MatchMulti
 
 class EsportAPIService:
     def __init__(self):
+        # Initialize logger and settings
         self.logging = LoggerManager()
         settings = get_settings()
         self.base_url = settings.BACK_PANDA_BASE_URL
         self.api_key = settings.BACK_PANDA_API_KEY
 
     def fetch_matches_for_team(self, team_id):
-        """Récupère et normalise les matchs d'une équipe."""
+        """Fetch and normalize matches for a given team."""
         url = f"{self.base_url}/teams/{team_id}/matches?filter[status]=not_started&sort=begin_at"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -38,9 +39,9 @@ class EsportAPIService:
             match = Box(match_json)
             game_slug = match.videogame.slug
             
-            # On sélectionne le parser API à utiliser via le mapping
+            # Select the API parser based on the game type
             parser_key = GAME_API_PARSER_MAPPING.get(game_slug, GameApiParser.DUO)
-            # Association des clés aux fonctions de parsing
+            # Map the parser key to the corresponding function
             api_parser_mapping = {
                 GameApiParser.DUO: self._api_parse_duo,
                 GameApiParser.RL: self._api_parse_rl,
@@ -53,7 +54,7 @@ class EsportAPIService:
         return matches
 
     def _api_parse_duo(self, match):
-        """Extraction pour jeux à deux équipes (LoL, VALO)."""
+        """Parse matches for duo team games (e.g., LoL, VALO)."""
         stream = next(
             (s for s in match.streams_list if s.main and s.language == 'fr'),
             next((s for s in match.streams_list if s.main), None)
@@ -73,6 +74,7 @@ class EsportAPIService:
             }
         ]
         
+        # Duration based on the number of games
         if match.number_of_games == 5:
             duration = timedelta(hours=3)
         elif match.number_of_games == 3:
@@ -80,6 +82,7 @@ class EsportAPIService:
         else:
             duration = timedelta(hours=1)
         
+        # Return the parsed match object
         return MatchDuo(
             id=f"{match.league_id}{match.tournament_id}{match.serie_id}{match.id}",
             tournament_name=match.tournament.name,
@@ -97,7 +100,7 @@ class EsportAPIService:
         )
 
     def _api_parse_rl(self, match):
-        """Extraction pour jeux à deux équipes (LoL, VALO)."""
+        """Parse Rocket League matches."""
         stream = next(
             (s for s in match.streams_list if s.main and s.language == 'fr'),
             next((s for s in match.streams_list if s.main), None)
@@ -117,13 +120,15 @@ class EsportAPIService:
             }
         ]
         
+        # Duration for Rocket League matches based on number of games
         if match.number_of_games == 5:
             duration = timedelta(hours=1)
         elif match.number_of_games == 7:
-            duration = timedelta(minutes=90)
+            duration = timedelta(minutes=90) # Average time for a BO7
         else:
             duration = timedelta(hours=1)
         
+        # Return the parsed match object
         return MatchDuo(
             id=f"{match.league_id}{match.tournament_id}{match.serie_id}{match.id}",
             tournament_name=match.tournament.name,
@@ -141,14 +146,14 @@ class EsportAPIService:
         )
 
     def _api_parse_multi(self, match):
-        """Extraction pour jeux multi-joueurs (Fortnite, TFT, etc.)."""
+        """Parse multi-player games (e.g., Fortnite, TFT)."""
         stream = next(
             (s for s in match.streams_list if s.main and s.language == 'fr'),
             next((s for s in match.streams_list if s.main), None)
         )
         stream_url = stream.raw_url if stream else ""
         players = match.players if hasattr(match, 'players') else []
-        duration = timedelta(hours=1)
+        duration = timedelta(hours=1) # Default duration for multi-player games
         return MatchMulti(
             id=f"{match.league_id}{match.tournament_id}{match.serie_id}{match.id}",
             tournament_name=match.tournament.name,
