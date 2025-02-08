@@ -19,38 +19,53 @@ class EsportAPIService:
         self.api_key = settings.BACK_PANDA_API_KEY
 
     def fetch_matches_for_team(self, team_id):
-        """Fetch and normalize matches for a given team."""
-        url = f"{self.base_url}/teams/{team_id}/matches?filter[status]=not_started&sort=begin_at"
+        """Fetch and normalize matches for a given team, handling pagination."""
+        url = f"{self.base_url}/teams/{team_id}/matches?filter[status]=not_started&sort=begin_at&page="
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Accept": "application/json"
         }
-        self.logging.info(f"Fetching matches for team {team_id} from URL: {url}")
-        try:
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-        except requests.RequestException as e:
-            self.logging.error(f"Error fetching matches: {e}")
-            return []
-
         matches = []
-        for match_json in data:
-            match = Box(match_json)
-            game_slug = match.videogame.slug
+        page = 1
+        
+        self.logging.info(f"Starting to fetch matches for team {team_id}.")
+        
+        while True:
+            paginated_url = f"{url}{page}"
+            self.logging.info(f"Fetching page {page} from URL: {paginated_url}")
             
-            # Select the API parser based on the game type
-            parser_key = GAME_API_PARSER_MAPPING.get(game_slug, GameApiParser.DUO)
-            # Map the parser key to the corresponding function
-            api_parser_mapping = {
-                GameApiParser.DUO: self._api_parse_duo,
-                GameApiParser.RL: self._api_parse_rl,
-                GameApiParser.MULTI: self._api_parse_multi,
-            }
-            parser = api_parser_mapping.get(parser_key, self._api_parse_duo)
-            match_obj = parser(match)
-            if match_obj:
-                matches.append(match_obj)
+            try:
+                response = requests.get(paginated_url, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+            except requests.RequestException as e:
+                self.logging.error(f"Error fetching matches from page {page}: {e}")
+                break
+            
+            if not data:  # If no data is returned, we break out of the loop
+                self.logging.info(f"No more matches found for team {team_id} on page {page}.")
+                break
+            
+            # Process each match in the response
+            for match_json in data:
+                match = Box(match_json)
+                game_slug = match.videogame.slug
+                
+                # Select the API parser based on the game type
+                parser_key = GAME_API_PARSER_MAPPING.get(game_slug, GameApiParser.DUO)
+                # Map the parser key to the corresponding function
+                api_parser_mapping = {
+                    GameApiParser.DUO: self._api_parse_duo,
+                    GameApiParser.RL: self._api_parse_rl,
+                    GameApiParser.MULTI: self._api_parse_multi,
+                }
+                parser = api_parser_mapping.get(parser_key, self._api_parse_duo)
+                match_obj = parser(match)
+                if match_obj:
+                    matches.append(match_obj)
+            
+            page += 1  # Increment the page for the next request
+        
         return matches
 
     def _api_parse_duo(self, match):
