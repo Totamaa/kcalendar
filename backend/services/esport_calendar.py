@@ -54,13 +54,16 @@ class EsportCalendarService:
  
         matches = []
         for match_json in data:
-            match = Box(match_json)
+            match = Box(match_json) # Convert the JSON data to a Box object for easy access
+            
+            # Get the stream URL for the match
             stream = next(
                 (s for s in match.streams_list if s.main and s.language == 'fr'),
                 next((s for s in match.streams_list if s.main), None)
             )
             match.stream_url = stream.raw_url if stream else ""
             
+            # Add the match data to the list
             matches.append({
                 "id": f"{match.league_id}{match.tournament_id}{match.serie_id}{match.id}",
                 "tournament_name": match.tournament.name,
@@ -118,7 +121,7 @@ class EsportCalendarService:
         """Generate calendar events from the match data and update the .ics calendar"""
         calendar = self._load_existing_calendar()
         
-        # Garder une trace des événements existants
+        # keep track of existing events
         existing_events = {}
         for component in calendar.walk('vevent'):
             uid = component.get('uid')
@@ -129,14 +132,14 @@ class EsportCalendarService:
             match = Box(match)
             event_uid = f"{match.id}@esport_calendar"
             
-            # Créer un nouvel événement
+            # create new event
             event = Event()
             
-            # Configurer l'événement
+            # setup event properties
             event.add('uid', event_uid)
             event.add('summary', f"[{match.league_name}] {match.opponents_1_name} - {match.opponents_2_name} ({match.tournament_name} BO{match.number_of_games})")
             
-            # Description détaillée
+            # detailed description
             description = (
                 f"Video Game: [{match.videogame_name}] {match.videogame_slug}\n"
                 f"League: {match.league_name}\n"
@@ -147,13 +150,13 @@ class EsportCalendarService:
             )
             event.add('description', description)
             
-            # Gérer la date et la durée
+            # Handle date and duration
             start_time = datetime.fromisoformat(match.begin_at)
             if not start_time.tzinfo:
                 start_time = pytz.UTC.localize(start_time)
             event.add('dtstart', start_time)
             
-            # Définir la durée selon le nombre de matchs
+            # set duration based on match type
             if match.number_of_games == 5:
                 duration = timedelta(hours=3)
             elif match.number_of_games == 3:
@@ -162,10 +165,10 @@ class EsportCalendarService:
                 duration = timedelta(hours=1)
             event.add('duration', duration)
             
-            # Ajouter l'URL du stream
+            # add stream URL
             event.add('location', vText(match.stream_url))
  
-            # Mettre à jour ou ajouter l'événement
+            # update or add the event to the calendar
             if event_uid in existing_events:
                 self.logging.info(f"Updating event: {match.opponents_1_name} vs {match.opponents_2_name}")
                 calendar.subcomponents = [
@@ -177,7 +180,7 @@ class EsportCalendarService:
             
             calendar.add_component(event)
  
-        # Sauvegarder dans le fichier temporaire
+        # save to temporary file
         with open(self.temp_ics_file_path, 'wb') as f:
             f.write(calendar.to_ical())
         
