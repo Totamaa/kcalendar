@@ -89,8 +89,6 @@ class EsportAPIService:
             }
         ]
         
-        self.logging.debug(f"opponents: {opponents}")
-        
         # Duration based on the number of games
         if match.number_of_games == 5:
             duration = timedelta(hours=3)
