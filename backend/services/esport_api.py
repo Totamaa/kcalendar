@@ -28,8 +28,6 @@ class EsportAPIService:
         matches = []
         page = 1
         
-        self.logging.info(f"Starting to fetch matches for team {team_id}.")
-        
         while True:
             paginated_url = f"{url}{page}"
             self.logging.info(f"Fetching page {page} from URL: {paginated_url}")
@@ -75,6 +73,10 @@ class EsportAPIService:
             next((s for s in match.streams_list if s.main), None)
         )
         stream_url = stream.raw_url if stream else ""
+        
+        # if we don't know opponent yet
+        if len(match.opponents) != 2:
+            return None
         
         opponents = [
             {
