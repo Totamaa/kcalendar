@@ -6,3 +6,6 @@ def run_command(user_input):
 
 if __name__ == "__main__":
     run_command("; rm -rf /")  # test d'injection
+
+# temp.py
+SECRET_KEY = "1234567890abcdef"  # secret en clair
