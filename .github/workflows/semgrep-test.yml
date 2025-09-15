@@ -1,4 +1,4 @@
-name: Semgrep Code Scan
+name: Semgrep Full Audit
 
 on:
   push:
@@ -23,30 +23,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install semgrep
 
-      # Run JSON output (pour artefact)
+      # Run Semgrep (JSON output)
       - name: Run Semgrep (JSON output)
         run: |
-          semgrep --config=p/security-audit \
-                  --severity=WARNING \
-                  --error \
-                  --json > semgrep-results.json || true
+          semgrep \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --config=p/owasp-top-ten \
+            --json > semgrep-results.json \
+            --error
 
-      # Run SARIF output (pour GitHub Security + annotations PR)
+      # Run Semgrep (SARIF output)
       - name: Run Semgrep (SARIF output)
         run: |
-          semgrep --config=p/security-audit \
-                  --severity=WARNING \
-                  --error \
-                  --sarif > semgrep-results.sarif || true
+          semgrep \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --config=p/owasp-top-ten \
+            --sarif > semgrep-results.sarif \
+            --error
 
-      # Upload JSON
+      # Upload JSON artifact
       - name: Upload Semgrep JSON report
         uses: actions/upload-artifact@v4
         with:
           name: semgrep-json-report
           path: semgrep-results.json
 
-      # Upload SARIF → GitHub Security + PR annotations
+      # Upload SARIF to GitHub Security
       - name: Upload Semgrep SARIF report
         uses: github/codeql-action/upload-sarif@v3
         with:
