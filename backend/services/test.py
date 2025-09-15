@@ -13,6 +13,19 @@ from schemas.match_multi import MatchMulti
 class EsportCalendarService:
     def __init__(self):
         # Initialize logger, API service and team IDs for fetching matches
+        """
+        Initialize the EsportCalendarService.
+        
+        Sets up the internal logger and API service, configures the list of team IDs whose matches will be fetched, and establishes filesystem paths for the calendar files. Ensures the static directory exists.
+        
+        Attributes:
+            logging: LoggerManager instance used for service logging.
+            api_service: EsportAPIService used to fetch match data.
+            team_ids (list[int]): Numeric IDs for teams to fetch matches for.
+            static_dir (str): Directory where calendar files are stored.
+            ics_file_path (str): Path to the primary calendar file (calendar.ics).
+            temp_ics_file_path (str): Path to the temporary calendar file used for atomic updates (calendar_temp.ics).
+        """
         self.logging = LoggerManager()
         self.api_service = EsportAPIService()
         self.team_ids = [
@@ -50,7 +63,18 @@ class EsportCalendarService:
         self.logging.info(f"Calendar update completed in {elapsed} seconds.")
 
     def _load_existing_calendar(self):
-        """Load the existing calendar or create a new one if it doesn't exist."""
+        """
+        Load and return the existing iCalendar file, or create and return a new Calendar if the file is missing or cannot be parsed.
+        
+        If the ICS file at self.ics_file_path exists, attempts to parse and return it as an icalendar.Calendar. If the file does not exist or parsing fails, returns a newly constructed Calendar populated with standard properties:
+        - version '2.0'
+        - prodid '-//esport calendar//'
+        - calscale 'GREGORIAN'
+        - x-wr-calname 'Esport Matches'
+        
+        Returns:
+            icalendar.Calendar: The loaded or newly created calendar object.
+        """
         if os.path.exists(self.ics_file_path):
             try:
                 with open(self.ics_file_path, 'rb') as f:
@@ -67,7 +91,18 @@ class EsportCalendarService:
         return cal
 
     def _generate_calendar_events(self, matches):
-        """Generate or update ICS events from the fetched matches."""
+        """
+        Generate or update calendar VEVENTs from a list of match objects and write the result to the temporary ICS file.
+        
+        Loads the existing calendar (or creates a new one), converts each match into an ical Event (using _calendar_event_duo or _calendar_event_multi depending on the match type), and ensures there are no duplicate events by UID: if an event with the same UID already exists it is replaced. The resulting calendar is written in binary iCal format to self.temp_ics_file_path.
+        
+        Parameters:
+            matches (Iterable[MatchDuo | MatchMulti]): Iterable of match objects to convert into calendar events. Each item should be an instance the service recognizes (MatchDuo or MatchMulti); unrecognized types are treated as duo matches.
+        
+        Side effects:
+            - Reads the existing calendar via _load_existing_calendar().
+            - Writes the updated calendar to the temporary ICS file at self.temp_ics_file_path.
+        """
         cal = self._load_existing_calendar()
         existing_uids = {comp.get('uid') for comp in cal.walk('vevent') if comp.get('uid')}
 
@@ -93,7 +128,11 @@ class EsportCalendarService:
         self.logging.info("Temporary calendar file generated.")
 
     def _replace_calendar_atomically(self):
-        """Replace the old calendar file with the new one atomically."""
+        """
+        Atomically replace the main calendar file with the temporary calendar file.
+        
+        Moves self.temp_ics_file_path to self.ics_file_path. If the move fails, the temporary file is removed if present to avoid leaving a stale temp file. Exceptions are handled internally (no exception is propagated).
+        """
         try:
             shutil.move(self.temp_ics_file_path, self.ics_file_path)
             self.logging.info("Calendar file updated successfully.")
@@ -103,7 +142,25 @@ class EsportCalendarService:
                 os.remove(self.temp_ics_file_path)
 
     def _calendar_event_duo(self, match: MatchDuo):
-        """Create an ICS event for a duo-team match."""
+        """
+        Create an iCalendar VEVENT for a two-team (duo) match.
+        
+        Builds an Event with a stable UID ("<match.id>@esport_calendar"), a summary in the form
+        "[<league_name>] <team1> vs <team2> (<tournament_name> BO<n>)", and a multiline description
+        containing videogame, league, tournament, match slug, and both teams' location/name/acronym.
+        
+        The event's start time (dtstart) is ensured to be timezone-aware; if the match begin_at has no
+        tzinfo it is localized to UTC. The event also sets duration and location (stream URL).
+        
+        Parameters:
+            match (MatchDuo): Match object for a duo-team match; expected to provide at least
+                id, opponents (two objects with name/location/acronym), league_name, tournament_name,
+                tournament_tier, tournament_slug, videogame_slug, videogame_name, slug,
+                begin_at (datetime), duration (timedelta), and stream_url.
+        
+        Returns:
+            icalendar.event.Event: The constructed VEVENT ready to be added to a Calendar.
+        """
         uid = f"{match.id}@esport_calendar"
         event = Event()
         event.add('uid', uid)
@@ -134,7 +191,26 @@ class EsportCalendarService:
         return event
 
     def _calendar_event_multi(self, match: MatchMulti):
-        """Create an ICS event for a multi-player match."""
+        """
+        Create an iCalendar VEVENT for a multi-player match.
+        
+        Builds and returns an icalendar.Event with:
+        - uid set to "<match.id>@esport_calendar"
+        - summary in the form "[<league_name>] <slug>"
+        - a multiline description containing videogame, league, tournament tier/slug and match slug
+        - dtstart parsed from match.begin_at (ISO 8601 string). If the parsed datetime is naive, it is localized to UTC.
+        - duration set from match.duration
+        - location set to the match stream URL
+        
+        Parameters:
+            match (MatchMulti): Match object where
+                - match.begin_at is an ISO 8601 datetime string,
+                - match.duration is a datetime.timedelta,
+                - match.stream_url is a string URL.
+        
+        Returns:
+            icalendar.Event: The constructed VEVENT ready to be added to a Calendar.
+        """
         uid = f"{match.id}@esport_calendar"
         event = Event()
         event.add('uid', uid)
