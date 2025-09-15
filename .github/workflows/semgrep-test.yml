@@ -26,7 +26,7 @@ jobs:
       # Run JSON output (pour artefact)
       - name: Run Semgrep (JSON output)
         run: |
-          semgrep --config=p/ci \
+          semgrep --config=p/security-audit \
                   --severity=ERROR \
                   --error \
                   --json > semgrep-results.json || true
@@ -34,7 +34,7 @@ jobs:
       # Run SARIF output (pour GitHub Security + annotations PR)
       - name: Run Semgrep (SARIF output)
         run: |
-          semgrep --config=p/ci \
+          semgrep --config=p/security-audit \
                   --severity=ERROR \
                   --error \
                   --sarif > semgrep-results.sarif || true
