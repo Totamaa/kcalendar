@@ -1,9 +1,9 @@
 name: Semgrep Test
 
 on:
-  pull_request:         # à chaque PR vers n'importe quelle branche
+  pull_request:
   push:
-    branches: [ "main" ]  # et à chaque push sur main
+    branches: [ "main" ]
 
 jobs:
   semgrep:
@@ -18,7 +18,7 @@ jobs:
           generateSarif: true
           output: semgrep.sarif
 
-      - name: Upload results to GitHub
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: semgrep.sarif
