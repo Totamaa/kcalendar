@@ -27,7 +27,7 @@ jobs:
       - name: Run Semgrep (JSON output)
         run: |
           semgrep --config=p/security-audit \
-                  --severity=ERROR \
+                  --severity=WARNING \
                   --error \
                   --json > semgrep-results.json || true
 
@@ -35,7 +35,7 @@ jobs:
       - name: Run Semgrep (SARIF output)
         run: |
           semgrep --config=p/security-audit \
-                  --severity=ERROR \
+                  --severity=WARNING \
                   --error \
                   --sarif > semgrep-results.sarif || true
 
