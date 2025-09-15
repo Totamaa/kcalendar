@@ -23,22 +23,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install semgrep
 
-      - name: Run Semgrep with strict rules (JSON + SARIF)
+      - name: Run Semgrep (JSON output)
         run: |
           semgrep --config=p/ci \
                   --severity=ERROR \
                   --error \
-                  --json > semgrep-results.json \
+                  --json > semgrep-results.json || true
+
+      - name: Run Semgrep (SARIF output)
+        run: |
+          semgrep --config=p/ci \
+                  --severity=ERROR \
+                  --error \
                   --sarif > semgrep-results.sarif || true
 
-      # Upload JSON for manual download
       - name: Upload Semgrep JSON report
         uses: actions/upload-artifact@v4
         with:
           name: semgrep-json-report
           path: semgrep-results.json
 
-      # Upload SARIF to GitHub Security
       - name: Upload Semgrep SARIF report
         uses: github/codeql-action/upload-sarif@v3
         with:
