@@ -35,9 +35,24 @@ jobs:
       - name: Run Semgrep (SARIF output)
         run: |
           semgrep \
-            --config=p/security-audit \
-            --config=p/secrets \
+            --config=p/comment \
+            --config=p/cwe-top-25 \
+            --config=p/default \
             --config=p/owasp-top-ten \
+            --config=p/r2c-security-audit \
+            --config=p/secure-defaults \
+            --config=p/javascript \
+            --config=p/python \
+            --config=p/react \
+            --config=p/secrets \
+            --config=p/docker-compose \
+            --config=p/dockerfile \
+            --config=p/bandit \
+            --config=p/brakeman \
+            --config=p/eslint \
+            --config=p/gitleaks \
+            --config=p/phpcs-security-audit \
+            --config=p/security-code-scan \
             --sarif > semgrep-results.sarif || true
 
       - name: Upload Semgrep JSON report
