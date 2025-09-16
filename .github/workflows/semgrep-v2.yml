@@ -25,56 +25,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Génération SARIF
-      - name: Run semgrep (SARIF)
-        run: |
-          semgrep \
-            --config=p/comment \
-            --config=p/cwe-top-25 \
-            --config=p/default \
-            --config=p/owasp-top-ten \
-            --config=p/r2c-security-audit \
-            --config=p/secure-defaults \
-            --config=p/javascript \
-            --config=p/python \
-            --config=p/react \
-            --config=p/secrets \
-            --config=p/docker-compose \
-            --config=p/dockerfile \
-            --config=p/bandit \
-            --config=p/brakeman \
-            --config=p/eslint \
-            --config=p/gitleaks \
-            --config=p/phpcs-security-audit \
-            --config=p/security-code-scan \
-            --sarif > semgrep.sarif
-
-      # Patch des severities pour GitHub
-      - name: Fix SARIF severities with jq
-        run: |
-          jq '
-            .runs[].results |= map(
-              if .rule.severity then
-                .rule.severity =
-                  (if .rule.severity | ascii_downcase == "info" then "0.0"
-                   elif .rule.severity | ascii_downcase == "low" then "2.0"
-                   elif .rule.severity | ascii_downcase == "medium" then "5.0"
-                   elif .rule.severity | ascii_downcase == "high" then "8.0"
-                   elif .rule.severity | ascii_downcase == "critical" then "9.5"
-                   else .rule.severity end)
-              else .
-              end
-            )
-          ' semgrep.sarif > semgrep-fixed.sarif
-          mv semgrep-fixed.sarif semgrep.sarif
-
-
-      - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: semgrep.sarif
-        if: always()
-
       # Génération JSON pour reviewdog
       - name: Run semgrep (JSON)
         run: |
@@ -104,3 +54,42 @@ jobs:
         with:
           name: semgrep.json
           path: semgrep.json
+
+      # Génération SARIF
+      - name: Run semgrep (SARIF)
+        run: |
+          semgrep \
+            --config=p/comment \
+            --config=p/cwe-top-25 \
+            --config=p/default \
+            --config=p/owasp-top-ten \
+            --config=p/r2c-security-audit \
+            --config=p/secure-defaults \
+            --config=p/javascript \
+            --config=p/python \
+            --config=p/react \
+            --config=p/secrets \
+            --config=p/docker-compose \
+            --config=p/dockerfile \
+            --config=p/bandit \
+            --config=p/brakeman \
+            --config=p/eslint \
+            --config=p/gitleaks \
+            --config=p/phpcs-security-audit \
+            --config=p/security-code-scan \
+            --sarif > semgrep.sarif
+
+      # Patch des severities pour GitHub
+      - name: Fix SARIF severities
+        run: |
+          sed -i 's/"info"/"0.0"/Ig' semgrep.sarif
+          sed -i 's/"low"/"2.0"/Ig' semgrep.sarif
+          sed -i 's/"medium"/"5.0"/Ig' semgrep.sarif
+          sed -i 's/"high"/"8.0"/Ig' semgrep.sarif
+          sed -i 's/"critical"/"9.5"/Ig' semgrep.sarif
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+        if: always()
