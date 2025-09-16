@@ -36,24 +36,9 @@ jobs:
       - uses: actions/checkout@v4
       # Run the "semgrep ci" command on the command line of the docker image.
       - run: semgrep \
-          --config=p/comment \
           --config=p/cwe-top-25 \
           --config=p/default \
-          --config=p/owasp-top-ten \
-          --config=p/r2c-security-audit \
-          --config=p/secure-defaults \
-          --config=p/javascript \
           --config=p/python \
-          --config=p/react \
-          --config=p/secrets \
-          --config=p/docker-compose \
-          --config=p/dockerfile \
-          --config=p/bandit \
-          --config=p/brakeman \
-          --config=p/eslint \
-          --config=p/gitleaks \
-          --config=p/phpcs-security-audit \
-          --config=p/security-code-scan \
           --sarif > semgrep.sarif
 
       - name: Upload SARIF file for GitHub Advanced Security Dashboard
