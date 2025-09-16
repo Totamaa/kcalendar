@@ -86,10 +86,8 @@ jobs:
             --config=p/security-code-scan \
             --json > semgrep.json
 
-      # Affichage dans la PR via reviewdog
-      - name: Report findings with reviewdog
-        uses: reviewdog/action-jsonlint@v1
+      - name: Upload Semgrep JSON report
+        uses: actions/upload-artifact@v4
         with:
-          reporter: github-pr-review
-          level: warning
-          json_file: semgrep.json
+          name: semgrep.json
+          path: semgrep.json
