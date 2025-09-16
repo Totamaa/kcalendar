@@ -50,11 +50,24 @@ jobs:
             --sarif > semgrep.sarif
 
       # Patch des severities pour GitHub
-      - name: Fix SARIF severities
+      - name: Fix SARIF severities with jq
         run: |
-          sed -i 's/"Low"/"2.0"/g' semgrep.sarif
-          sed -i 's/"Medium"/"5.0"/g' semgrep.sarif
-          sed -i 's/"High"/"8.0"/g' semgrep.sarif
+          jq '
+            .runs[].results |= map(
+              if .rule.severity then
+                .rule.severity =
+                  (if .rule.severity | ascii_downcase == "info" then "0.0"
+                   elif .rule.severity | ascii_downcase == "low" then "2.0"
+                   elif .rule.severity | ascii_downcase == "medium" then "5.0"
+                   elif .rule.severity | ascii_downcase == "high" then "8.0"
+                   elif .rule.severity | ascii_downcase == "critical" then "9.5"
+                   else .rule.severity end)
+              else .
+              end
+            )
+          ' semgrep.sarif > semgrep-fixed.sarif
+          mv semgrep-fixed.sarif semgrep.sarif
+
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
