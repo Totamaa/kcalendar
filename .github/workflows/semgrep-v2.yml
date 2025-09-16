@@ -1,41 +1,32 @@
-# Name of this GitHub Actions workflow.
 name: Semgrep-v2
 
 on:
-  # Scan changed files in PRs (diff-aware scanning):
   pull_request: {}
-  # Scan on-demand through GitHub Actions interface:
   workflow_dispatch: {}
-  # Scan mainline branches and report all findings:
   push:
     branches: ["master", "main"]
 
 permissions:
-  # This permission is required when uploading sarifs to any repository at GitHub
   security-events: write
-  # These permissions are only required when uploading sarifs to private and internal repositories at GitHub
   contents: read
   actions: read
+  pull-requests: write
 
 jobs:
   semgrep:
-    # User definable name of this GitHub Actions job.
     name: semgrep/ci
-    # If you are self-hosting, change the following `runs-on` value:
     runs-on: ubuntu-latest
 
     container:
-      # A Docker image with Semgrep installed. Do not change this.
       image: semgrep/semgrep
 
-    # Skip any PR created by dependabot to avoid permission issues:
     if: (github.actor != 'dependabot[bot]')
 
     steps:
-      # Fetch project source with GitHub Actions Checkout. Use either v3 or v4.
       - uses: actions/checkout@v4
-      # Run the "semgrep ci" command on the command line of the docker image.
-      - name: Run semgrep and create SARIF file
+
+      # Génération SARIF
+      - name: Run semgrep (SARIF)
         run: |
           semgrep \
             --config=p/comment \
@@ -58,8 +49,47 @@ jobs:
             --config=p/security-code-scan \
             --sarif > semgrep.sarif
 
-      - name: Upload SARIF file for GitHub Advanced Security Dashboard
+      # Patch des severities pour GitHub
+      - name: Fix SARIF severities
+        run: |
+          sed -i 's/"Low"/"2.0"/g' semgrep.sarif
+          sed -i 's/"Medium"/"5.0"/g' semgrep.sarif
+          sed -i 's/"High"/"8.0"/g' semgrep.sarif
+
+      - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: semgrep.sarif
         if: always()
+
+      # Génération JSON pour reviewdog
+      - name: Run semgrep (JSON)
+        run: |
+          semgrep \
+            --config=p/comment \
+            --config=p/cwe-top-25 \
+            --config=p/default \
+            --config=p/owasp-top-ten \
+            --config=p/r2c-security-audit \
+            --config=p/secure-defaults \
+            --config=p/javascript \
+            --config=p/python \
+            --config=p/react \
+            --config=p/secrets \
+            --config=p/docker-compose \
+            --config=p/dockerfile \
+            --config=p/bandit \
+            --config=p/brakeman \
+            --config=p/eslint \
+            --config=p/gitleaks \
+            --config=p/phpcs-security-audit \
+            --config=p/security-code-scan \
+            --json > semgrep.json
+
+      # Affichage dans la PR via reviewdog
+      - name: Report findings with reviewdog
+        uses: reviewdog/action-jsonlint@v1
+        with:
+          reporter: github-pr-review
+          level: warning
+          json_file: semgrep.json
